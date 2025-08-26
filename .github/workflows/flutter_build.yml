@@ -1,37 +1,32 @@
-name: Build QwikQR APK
+name: Flutter Build APK
 
 on:
   push:
-    branches: 
-      - main
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      # Setup Flutter environment
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.1'
           channel: 'stable'
 
-      # Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # Build APK for Android ARM (release)
-      - name: Build APK (release)
-        run: flutter build apk --release --no-shrink --target-platform=android-arm
+      - name: Build APK
+        run: flutter build apk --release
 
-      # Upload the APK artifact so it can be downloaded
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: qwikqr-release-apk
+          name: qwikqr-apk
           path: build/app/outputs/flutter-apk/app-release.apk
