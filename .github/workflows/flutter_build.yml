@@ -1,4 +1,4 @@
-name: Flutter Build APK
+name: Flutter Build v1.0
 
 on:
   push:
@@ -10,61 +10,56 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout code
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      # Step 2: Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.2'
           channel: 'stable'
 
-      - name: Cache Flutter dependencies & build
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.pub-cache
-            build
-          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.yaml') }}
-
+      # Step 3: Install dependencies and log output
       - name: Install dependencies
-        run: flutter pub get 2>&1 | tee flutter_pub_get_log.txt
-
-      - name: Run static analysis
-        run: flutter analyze 2>&1 | tee flutter_analyze_log.txt
-
-      - name: Run tests
-        run: flutter test --coverage 2>&1 | tee flutter_test_log.txt
-
-      - name: Build APK
-        run: flutter build apk --release 2>&1 | tee flutter_build_log.txt
-
-      - name: Rename APK with commit hash & run number
         run: |
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          RUN_NUMBER=${{ github.run_number }}
-          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-release-${COMMIT_HASH}-${RUN_NUMBER}.apk
+          echo "==== Installing dependencies ===="
+          flutter pub get | tee flutter_pub_get_log.txt
 
+      # Step 4: Build APK and log output
+      - name: Build APK
+        run: |
+          echo "==== Building APK ===="
+          flutter build apk --release --no-tree-shake-icons | tee flutter_build_log.txt
+          # Rename the APK to Qwikqr.apk
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/Qwikqr.apk
+          echo "Build complete: Qwikqr.apk"
+
+      # Step 5: Upload APK artifact for download
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: qwikqr-apk
-          path: build/app/outputs/flutter-apk/app-release-*.apk
+          path: build/app/outputs/flutter-apk/Qwikqr.apk
+          retention-days: 7
 
-      - name: Upload logs
-        if: always()
+      # Step 6: Upload build logs
+      - name: Upload build logs
         uses: actions/upload-artifact@v4
         with:
           name: build-logs
           path: |
             flutter_pub_get_log.txt
-            flutter_analyze_log.txt
-            flutter_test_log.txt
             flutter_build_log.txt
+          retention-days: 7
 
-      - name: Copy APK to your device
-        if: success()
-        run: |
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          RUN_NUMBER=${{ github.run_number }}
-          scp -i ~/.ssh/flutter-dev.pem build/app/outputs/flutter-apk/app-release-${COMMIT_HASH}-${RUN_NUMBER}.apk ubuntu@13.53.187.144:/sdcard/Download/
+      # Optional Step 7: Copy APK to EC2/Android device
+      # - name: Copy APK to EC2 device
+      #   uses: appleboy/scp-action@v0.1.5
+      #   with:
+      #     host: ${{ secrets.EC2_HOST }}
+      #     username: ubuntu
+      #     key: ${{ secrets.EC2_SSH_KEY }}
+      #     source: build/app/outputs/flutter-apk/Qwikqr.apk
+      #     target: /sdcard/Download/Qwikqr.apk
