@@ -19,19 +19,52 @@ jobs:
           flutter-version: '3.35.2'
           channel: 'stable'
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Cache Flutter dependencies & build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+            build
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.yaml') }}
 
-      - name: Analyze code for errors/warnings
-        run: |
-          flutter analyze --no-fatal-infos || true
-        shell: bash
+      - name: Install dependencies
+        run: flutter pub get 2>&1 | tee flutter_pub_get_log.txt
+
+      - name: Run static analysis
+        run: flutter analyze 2>&1 | tee flutter_analyze_log.txt
+
+      - name: Run tests
+        run: flutter test --coverage 2>&1 | tee flutter_test_log.txt
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release 2>&1 | tee flutter_build_log.txt
+
+      - name: Rename APK with commit hash & run number
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          RUN_NUMBER=${{ github.run_number }}
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-release-${COMMIT_HASH}-${RUN_NUMBER}.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: qwikqr-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-release-*.apk
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            flutter_pub_get_log.txt
+            flutter_analyze_log.txt
+            flutter_test_log.txt
+            flutter_build_log.txt
+
+      - name: Copy APK to your device
+        if: success()
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          RUN_NUMBER=${{ github.run_number }}
+          scp -i ~/.ssh/flutter-dev.pem build/app/outputs/flutter-apk/app-release-${COMMIT_HASH}-${RUN_NUMBER}.apk ubuntu@13.53.187.144:/sdcard/Download/
