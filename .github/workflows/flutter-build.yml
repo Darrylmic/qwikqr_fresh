@@ -2,7 +2,8 @@ name: Flutter Build APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -10,23 +11,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.2'  # Updated to support Dart >= 3.6
-          channel: 'stable'
+          flutter-version: '3.24.0'
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get 2>&1 | tee flutter_pub_get_log.txt
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release 2>&1 | tee flutter_build_log.txt
+
+      - name: Rename APK with commit hash and run number
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          RUN_NUMBER=${{ github.run_number }}
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-release-${COMMIT_HASH}-${RUN_NUMBER}.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: qwikqr-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-release-*.apk
+
+      - name: Upload build logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            flutter_pub_get_log.txt
+            flutter_build_log.txt
